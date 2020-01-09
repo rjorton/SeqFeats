@@ -520,4 +520,4 @@ else:
 
         fasta_calculate_cai(sys.argv[1], arg_ns)
 
-print("...finished ortools.py")
+print("...finished seqfeats_cai")
