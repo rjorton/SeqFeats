@@ -130,12 +130,15 @@ def calculate_dinuc_freqs(dinuc_counts):
     return dinuc_freqs
 
 
-def fasta_calculate_dinucs(filename, remove_duplicates):
+def fasta_calculate_dinucs(filename, remove_duplicates, remove_mito, ensembl_names, preproc):
     print("fasta_calculate_dinucs")
-    output_filename = get_filename_stub(filename, ".f") + "_dat.txt"
     print("Input FASTA file = " + filename)
+    output_filename = get_filename_stub(filename, ".f") + "_dat.txt"
     print("Output data file = " + output_filename)
     print("Removing duplicate genes [preserving longest length - first instance] = " + str(remove_duplicates))
+    print("Removing mitchondrial genes [looking for :MT:/:mt:] = " + str(remove_mito))
+    print("Sequence names already preprocessed in form >GeneID|TranscriptID = " + str(preproc))
+    print("Converting ensembl names to >GeneID|TranscriptID = " + str(ensembl_names))
 
     last_line = count_lines(filename)
     line_count = 0
@@ -143,6 +146,7 @@ def fasta_calculate_dinucs(filename, remove_duplicates):
     seq_unavailable = 0
     seq_zero = 0
     seq_added = 0
+    seq_mito = 0
     all_seqs = []
 
     with open(filename) as file_handler:
@@ -159,27 +163,48 @@ def fasta_calculate_dinucs(filename, remove_duplicates):
 
             if line.find(">") == 0 or line_count == last_line:
                 if seq_count > 0:
-                    # duplicate removal is based on gene name
-                    # could still be used to remove duplicates based on whole name if not in ensembl format
+                    # duplicate removal is based on gene name, not name - can still be used for non ensembl seqs so set gene to name initially
                     gene = name
                     transcript = ''
 
-                    pos = name.find(" gene:")
-                    if pos > 0:
-                        # >ENST00000311787.5 cds chromosome:GRCh38:10:49131154:49134008:-1 gene:ENSG00000172538.6 gene_biotype:protein_coding transcript_biotype:protein_coding gene_symbol:FAM170B description:family with sequence similarity 170 member B [Source:HGNC Symbol;Acc:HGNC:19736]
-                        transcript = name[1:name.find(" ")]
-                        gene = name[name.find(" gene:") + 6:]
-                        pos = gene.find(" ")
-                        if pos <= 0:
-                            gene = gene[0:]
-                        else:
-                            gene = gene[0:pos]
-                        name = ">" + gene + "|" + transcript
+                    # >ENST00000311787.5 cds chromosome:GRCh38:10:49131154:49134008:-1 gene:ENSG00000172538.6 gene_biotype:protein_coding transcript_biotype:protein_coding gene_symbol:FAM170B description:family with sequence similarity 170 member B [Source:HGNC Symbol;Acc:HGNC:19736]
 
-                    if sequence.lower() == "sequence unavailable":
+                    this_mito = False
+                    if remove_mito:
+                        pos = name.lower().find(":mt:")
+                        if pos > 0:
+                            this_mito = True
+
+                    if ensembl_names:
+                        pos = name.lower().find(" gene:")
+                        if pos > 0:
+                            pos = name.find(".")
+                            if pos <= 0:
+                                transcript = name[1:]
+                            else:
+                                transcript = name[1:name.find(".")]
+
+                            gene = name[name.find(" gene:") + 6:]
+                            pos = gene.find(".")
+                            if pos <= 0:
+                                gene = gene[0:]
+                            else:
+                                gene = gene[0:pos]
+                            name = ">" + gene + "|" + transcript
+
+                    if preproc:
+                        pos = name.lower().find("|")
+                        if pos > 0:
+                            gene = name[1:pos]
+                            transcript = name[pos+1:]
+
+                    # seq has been converted to uppercase already
+                    if sequence == "SEQUENCE UNAVAILABLE":
                         seq_unavailable += 1
                     elif len(sequence) == 0:
                         seq_zero += 1
+                    elif this_mito:
+                        seq_mito += 1
                     else:
                         sequence = correct_seq(sequence, name)
                         all_seqs.append([seq_count, name, gene, transcript, sequence, len(sequence)])
@@ -193,9 +218,13 @@ def fasta_calculate_dinucs(filename, remove_duplicates):
                     seq_count += 1
 
     print("Total sequences in file  = " + str(seq_count))
-    print("Usable sequences  = " + str(seq_added))
     print("Zero length sequences = " + str(seq_zero))
     print("Sequence unavailable = " + str(seq_unavailable))
+
+    if remove_mito:
+        print("Mitochondrial (:MT:) seqs = " + str(seq_mito))
+
+    print("Usable sequences  = " + str(seq_added))
 
     if remove_duplicates:
         seq_dict = {}
@@ -213,12 +242,18 @@ def fasta_calculate_dinucs(filename, remove_duplicates):
 
     with open(output_filename, "w") as file_output:
 
-        # Header - should the T single base be a U - and ATcontent AU - AT is standard term
-        file_output.write("Num\tName\tGene\tTranscript\tLength\tA\tC\tG\tT\tN")
-        file_output.write("\tGCcontent\tATcontent")
-        file_output.write("\tApA\tApC\tApG\tApU\tCpA\tCpC\tCpG\tCpU\tGpA\tGpC\tGpG\tGpU\tUpA\tUpC\tUpG\tUpU")
-        file_output.write("\tAA%\tAC%\tAG%\tAU%\tCA%\tCC%\tCG%\tCU%\tGA%\tGC%\tGG%\tGU%\tUA%\tUC%\tUG%\tUU%")
-        file_output.write("\n")
+        # Header -  technically not CG% etc as not *100
+        header_t = "Num\tName\tGene\tTranscript\tLength\tA\tC\tG\tT\tN"
+        header_t += "\tGCcontent\tATcontent"
+        header_t += "\tApA\tApC\tApG\tApT\tCpA\tCpC\tCpG\tCpT\tGpA\tGpC\tGpG\tGpT\tTpA\tTpC\tTpG\tTpT"
+        header_t += "\tAA%\tAC%\tAG%\tAT%\tCA%\tCC%\tCG%\tCT%\tGA%\tGC%\tGG%\tGT%\tTA%\tTC%\tTG%\tTT%"
+
+        header_u = "Num\tName\tGene\tTranscript\tLength\tA\tC\tG\tU\tN"
+        header_u += "\tGCcontent\tAUcontent"
+        header_u += "\tApA\tApC\tApG\tApU\tCpA\tCpC\tCpG\tCpU\tGpA\tGpC\tGpG\tGpU\tUpA\tUpC\tUpG\tUpU"
+        header_u += "\tAA%\tAC%\tAG%\tAU%\tCA%\tCC%\tCG%\tCU%\tGA%\tGC%\tGG%\tGU%\tUA%\tUC%\tUG%\tUU%"
+
+        file_output.write(header_t + "\n")
 
         seq_count = 0
         for seq in all_seqs:
@@ -235,49 +270,70 @@ def fasta_calculate_dinucs(filename, remove_duplicates):
             dinuc_freqs = calculate_dinuc_freqs(dinuc_counts)
 
             # seq_count (output_count), name, gene, transcript, length
-            file_output.write(str(seq_count) + "\t" + seq[1] + "\t" + seq[2] + "\t" + seq[3] + "\t" + str(seq[5]))
+            dat = str(seq_count) + "\t" + seq[1] + "\t" + seq[2] + "\t" + seq[3] + "\t" + str(seq[5])
 
             for base in base_freqs:
-                file_output.write("\t" + str(base_freqs[base]))
+                dat += "\t" + str(base_freqs[base])
 
-            file_output.write("\t" + str(gc_content["GC"]) + "\t" + str(gc_content["AT"]))
+            dat += "\t" + str(gc_content["GC"]) + "\t" + str(gc_content["AT"])
 
             for dinuc in dinuc_obsexp:
                 if dinuc == "NN":
                     continue
 
-                file_output.write("\t" + str(dinuc_obsexp[dinuc]))
+                dat += "\t" + str(dinuc_obsexp[dinuc])
 
             for dinuc in dinuc_freqs:
                 if dinuc == "NN":
                     continue
 
-                file_output.write("\t" + str(dinuc_freqs[dinuc]))
+                dat += "\t" + str(dinuc_freqs[dinuc])
 
-            file_output.write("\n")
+            dat += "\n"
+
+            file_output.write(dat)
 
 
 print("seqfeats_isg.py started...\n")
 
 arguments = len(sys.argv)
 
-if arguments == 2:
-    fasta_calculate_dinucs(sys.argv[1], False)
-elif arguments == 3:
-    if sys.argv[2].lower() == "yes" or sys.argv[2].lower() == "y" or sys.argv[2].lower() == "true" or sys.argv[2].lower() == "1":
-        arg_dups = True
-    elif sys.argv[2].lower() == "no" or sys.argv[2].lower() == "n" or sys.argv[2].lower() == "false" or sys.argv[2].lower() == "0":
-        arg_dups = False
-    else:
-        print("Error - unrecognised true/false argument can have [yes/y/true/1 or no/n/false/0]: " + sys.argv[2])
-        sys.exit(1)
+arg_dups = False
+arg_mito = False
+arg_names = False
+arg_pre = False
 
-    fasta_calculate_dinucs(sys.argv[1], arg_dups)
-else:
-    print("Error - incorrect number of arguments - example usage:")
+if arguments < 2:
+    print("Error - incorrect number of arguments [" + str(arguments) + "] - example usage:")
     print("seqfeats_isg.py sequences.fasta")
-    print("seqfeats_isg.py sequences.fasta remove_duplicates")
+    print("seqfeats_isg.py sequences.fasta [optional]remove-duplicates [optional]remove-mito [optional]ensembl-names")
+    print("remove-mito: discount sequences with :MT: in their sequence header (case insensitive)")
+    print("ensembl-names: convert full ensembl sequence name into >GeneID|TranscriptID format")
+    print("remove-duplicates: remove duplicate sequence names - the longest sequence is preserved - if a tie the first one encountered is preserved")
+    print("preproc-names: names already in >GeneID|TranscriptID format")
     print("Exiting...")
     sys.exit(1)
+
+if arguments > 2:
+    for argu in sys.argv:
+        if sys.argv.index(argu) < 2:
+            continue
+
+        if argu.lower() == "remove-duplicates":
+            arg_dups = True
+        elif argu.lower() == "remove-mito":
+            arg_mito = True
+        elif argu.lower() == "ensembl-names":
+            arg_names = True
+        elif argu.lower() == "preproc-names":
+            arg_pre = True
+        else:
+            print("Error - unrecognised argument: " + argu)
+            sys.exit(1)
+
+if arg_pre:
+    arg_names = False
+
+fasta_calculate_dinucs(sys.argv[1], arg_dups, arg_mito, arg_names, arg_pre)
 
 print("\n...finished seqfeats_isg.py ")
