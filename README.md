@@ -1,5 +1,7 @@
 ### SeqFeats
 
+CURRENTLY UNDERGOING TESTING - NOT FINISHED
+
 SeqFeats is python program to create various SEQuence FEATureS from FASTA sequence files. 
 
 This is replacing [VirusFeatures](https://github.com/rjorton/), and being expanded to included various different way to measure codon bias, codon pair bias, and dinucleotide bias, in both viral and host sequences. SeqFeats will also incorporate the original codon pair deoptimization and dinucleotide deoptimization routines.
@@ -47,3 +49,8 @@ File 2 _cai.txt: the CAI score for each sequence
 
 I would recommend [COUSIN](http://cousin.ird.fr) (COdon Usage Similarity INdex) for calculating CAI and a wealth of other codon bias mesures. 
 The seqfeats_cai.py script was created as COUSIN failed to process sequences will an N in them. It should give the same results as the CAI_59 metric in COUSIN.
+
+
+seqfeats_isg: observed/expected and raw dinucleotide frequencies of host sequences
+
+seqfeats_cpb: nucleotide, dinculeotide frequencies, and codon, aa, and codon-pairs biases of host sequences
