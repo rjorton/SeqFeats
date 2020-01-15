@@ -148,7 +148,7 @@ def fasta_process_seqs(filename, replace_names_lcl, replace_names_space,  replac
         print("Total genomes  = " + str(genome_count-1))
 
 
-print("CPB_SeqParser.py started...\n")
+print("seqfeats_parser.py started...\n")
 
 arguments = len(sys.argv)
 
@@ -161,15 +161,16 @@ arg_truncate_seq = False
 
 if arguments < 2:
     print("Error - incorrect number of arguments [" + str(arguments) + "] - example usage:")
-    print("CPB_SeqParser.py sequences.fasta")
-    print("CPB_SeqParser.py sequences.fasta [optional]replace-names [optional]name-space [optional]single-genome ")
-    print("replace-names-lcl: will replace the '>' with '>lcl|GenomeSeqN_cds_' where N is genome number (see below). The existing name with appear after _cds_")
+    print("seqfeats_parser.py sequences.fasta")
+    print("seqfeats_parser.py sequences.fasta [optional]replace-names-lcl [optional]replace-names-space [optional]replace-names-convert [optional]single-genome [optional]trim-seq [otpional]truncate-seq [optional]")
+    print("replace-names-lcl: will replace the '>' with '>lcl|GenomeSeqN_cds_existing_header' where N is genome number (see below).")
     print("replace-names-space: will replace '>' with '>GenomeN existing_header' - where N is genome number (see below)")
     print("replace-names-convert: convert '>lcl|Accession_cds_existing_header' to '>Accession existing_header'")
-    print("single-genome: all the coding sequences are from the same genome so N in GenomeN (see above) is always be 1. If not set, N increments with each sequence")
+    print("single-genome: all the coding sequences are from the same genome so N in GenomeN (see above) is always 1. If not set, N increments with each sequence")
     print("trim-seq: if coding sequence not a multiple of three then trim off last incomplete codon")
     print("truncate_seq: if coding sequence has a STOP before the last codon, then truncate the sequence at the first STOP")
-    print("output will be in single line FASTA format - all sequence on single line")
+    # fix slippage option
+    print("Output will be in single line FASTA format - all sequence on single line")
     print("Exiting...")
     sys.exit(1)
 
@@ -202,4 +203,4 @@ elif arg_replace_space:
 
 fasta_process_seqs(sys.argv[1], arg_replace_lcl, arg_replace_space, arg_replace_convert, arg_single_genome, arg_trim_seq, arg_truncate_seq)
 
-print("\n...finished CPB_SeqParser.py")
+print("\n...finished seqfeats_parser.py")
