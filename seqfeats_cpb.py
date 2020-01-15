@@ -508,6 +508,16 @@ def calculate_aa_freqs(aa_counts):
     return aa_freqs
 
 
+def calculate_aapair_freqs(aapair_counts):
+    aapir_sum = sum(aapair_counts.values())
+    aapair_freqs = {}
+    for aapair in aapair_counts:
+        aapair_freqs[aapair] = (aapair_counts[aapair]/float(aapir_sum))
+
+    # obs/exp accounting for count of AA1 and AA2 instead of freqs - or in addition to
+    return aapair_freqs
+
+
 def calculate_codon_freqs(codon_counts, aa_counts, codon_dict):
     codon_freqs = {}
 
@@ -543,6 +553,20 @@ def calculate_dinuc_freqs(dinuc_counts, base_counts):
             dinuc_freqs[dinuc] = 0
         else:
             dinuc_freqs[dinuc] = (dinuc_counts[dinuc]/float(dinuc_sum))/((base_counts[base1]/float(base_sum)) * (base_counts[base2]/float(base_sum)))
+
+    return dinuc_freqs
+
+
+def calculate_raw_dinuc_freqs(dinuc_counts):
+    dinuc_sum = sum(dinuc_counts.values())
+
+    dinuc_freqs = {}
+
+    for dinuc in dinuc_counts:
+        if dinuc == "NN":
+            continue
+
+        dinuc_freqs[dinuc] = (dinuc_counts[dinuc]/float(dinuc_sum))
 
     return dinuc_freqs
 
@@ -624,7 +648,6 @@ def fasta_calculate_cpbs(filename, force_trim):
                     name = line
                     seq_count += 1
 
-
     print("Coding sequences  = " + str(seq_count))
     print("Length 0 sequences = " + str(seq_zero))
     print("Incomplete sequences [not divisible by 3]  = " + str(seq_incomplete))
@@ -681,8 +704,14 @@ def fasta_calculate_cpbs(filename, force_trim):
                 base2 = dinuc[1].replace("T", "U")
                 file_output.write("\tNonBr" + base1 + "p" + base2)
 
-        file_output.write("\n")
+        for base in base_counts:
+            file_output.write("\tBr-" + base)
 
+        for aapair in aapair_counts:
+            if aapair != "??":
+                file_output.write("\t" + aapair[0:1] + "-" + aapair[1:2])
+
+        file_output.write("\n")
         # End of Header
 
         for seq in all_seqs:
@@ -708,8 +737,10 @@ def fasta_calculate_cpbs(filename, force_trim):
             total_codonpairs = sum(codonpair_counts.values())
 
             base_freqs = calculate_base_freqs(base_counts)
+            bridge_base_freqs = calculate_base_freqs(base_bridge_counts)
             gc_content = calculate_gc_content(base_counts)
             aa_freqs = calculate_aa_freqs(aa_counts)
+            aapair_freqs = calculate_aapair_freqs(aapair_counts)
             codon_freqs = calculate_codon_freqs(codon_counts, aa_counts, codon_aa_dict)
             dinuc_freqs = calculate_dinuc_freqs(dinuc_counts, base_counts)
             dinuc_bridge_freqs = calculate_dinuc_freqs(dinuc_bridge_counts, base_bridge_counts)
@@ -730,9 +761,11 @@ def fasta_calculate_cpbs(filename, force_trim):
             for codon in codon_freqs:
                 file_output.write("\t" + str(codon_freqs[codon]))
 
+            # given dinuc is now explanation of codon pair - what about plain old cpb freqs
             for cpb in cpb_scores:
                 file_output.write("\t" + str(cpb_scores[cpb]))
 
+            # raw instead/as well of obs/exp?: calculate_raw_dinuc_freqs()
             for dinuc in dinuc_freqs:
                 if dinuc == "CG" or dinuc == "TA":
                     continue
@@ -743,6 +776,13 @@ def fasta_calculate_cpbs(filename, force_trim):
 
             for dinuc in dinuc_nonbridge_freqs:
                 file_output.write("\t" + str(dinuc_nonbridge_freqs[dinuc]))
+
+            for base in bridge_base_freqs:
+                file_output.write("\t" + str(bridge_base_freqs[base]))
+
+            # obs/exp instead/as well?
+            for aa in aapair_freqs:
+                file_output.write("\t" + str(aapair_freqs[aa]))
 
             file_output.write("\n")
 
