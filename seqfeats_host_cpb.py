@@ -797,13 +797,13 @@ def fasta_calculate_cpbs(filename, force_trim):
             aapair_counts = create_aapair_counter()
 
 
-print("seqfeats_cpb.py started...")
+print("seqfeats_host_cpb.py started...")
 
 arguments = len(sys.argv)
 
 if arguments != 2:
     print("Error - incorrect number of arguments - example usage:")
-    print("seqfeats_cpb.py coding_sequences.fasta")
+    print("seqfeats_host_cpb.py coding_sequences.fasta")
     sys.exit(1)
 else:
     fasta_calculate_cpbs(sys.argv[1], True)
