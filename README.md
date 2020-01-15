@@ -50,6 +50,7 @@ File 2 _cai.txt: the CAI score for each sequence
 I would recommend [COUSIN](http://cousin.ird.fr) (COdon Usage Similarity INdex) for calculating CAI and a wealth of other codon bias mesures. 
 The seqfeats_cai.py script was created as COUSIN failed to process sequences will an N in them. It should give the same results as the CAI_59 metric in COUSIN.
 
+seqfeats_parser.py: minor sequence manipulation of names, and incomplete seqs, convert to single line FASTA
 
 seqfeats_isg: observed/expected and raw dinucleotide frequencies of host sequences
 
