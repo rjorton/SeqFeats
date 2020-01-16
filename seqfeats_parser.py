@@ -19,13 +19,13 @@ def correct_seq(this_seq, this_name):
 def check_seq_coding(this_seq, this_name, trim_seq, truncate_seq):
     seq_test = False
     new_seq = this_seq
+    seq_len = len(this_seq)
 
-    if len(this_seq) % 3 == 0:
+    if seq_len % 3 == 0:
         seq_test = True
     else:
         print("Warning - Sequence not divisible by 3: " + this_name)
         if trim_seq:
-            seq_len = len(this_seq)
             new_len = seq_len - (seq_len % 3)
             new_seq = this_seq[0:new_len]
             print("Trimming sequence, old length = " + str(seq_len) + ", new length = " + str(new_len))
@@ -43,7 +43,7 @@ def check_seq_coding(this_seq, this_name, trim_seq, truncate_seq):
             trunc_seq += this_codon
 
             if this_codon == "TAG" or this_codon == "TAA" or this_codon == "TGA":
-                print("Warning - stop codon found mid frame in seq: " + this_name)
+                print("Warning - stop codon found mid frame in seq, pos = " + str(i+1) + ": " + this_name)
 
                 if truncate_seq:
                     new_seq = trunc_seq
@@ -76,31 +76,40 @@ def get_filename_stub(this_name, this_ext):
     return this_stub
 
 
-def fasta_process_seqs(filename, replace_names_lcl, replace_names_space,  replace_names_convert, single_genome, trim_seq, truncate_seq):
+def fasta_process_seqs(filename, replace_names_lcl, replace_names_space,  replace_names_convert, single_genome, trim_seq, truncate_seq, is_viral):
     print("fasta_process_seqs")
     print("Input FASTA file = " + filename)
     output_filename = get_filename_stub(filename, ".f") + "_new.fasta"
-    print("Output fasta file = " + output_filename)
+    print("Outputting sequences in single line FASTA format to = " + output_filename)
+
+    if is_viral:
+        seq_stub = "ViralGenome"
+    else:
+        seq_stub = "Sequence"
 
     if replace_names_convert:
         print("Converting '>lcl|Accession_cds_existing_header' to '>Accession existing_header'")
-
-    if replace_names_lcl or replace_names_space:
+    elif replace_names_lcl or replace_names_space:
         if replace_names_lcl:
-            print("Replacing names with '>lcl|GenomeN_cds_existing_header', where N is genome number - see Single genome setting below")
+            print("Replacing names with '>lcl|" + seq_stub + "N_cds_existing_header', where N is genome number - see Single genome setting below")
         elif replace_names_space:
-            print("Replacing names with '>GenomeN existing_header', where N is genome number - see below")
+            print("Replacing names with '>" + seq_stub + "N existing_header', where N is genome number - see below")
 
-        print("Single genome [N always = 1] = " + str(single_genome))
+        if single_genome:
+            print("Single genome = " + str(single_genome) + ", so N always = 1")
+        else:
+            print("Single genome = " + str(single_genome) + ", so N increments with each sequence")
 
     print("Trim sequence if not multiple of 3: " + str(trim_seq))
     print("Truncate sequence if STOP codon found before end: " + str(truncate_seq))
-    print("Outputiing sequences in single line FASTA format")
 
     last_line = count_lines(filename)
     line_count = 0
     seq_count = 0
-    genome_count = 1
+    genome_count = 0
+
+    if single_genome:
+        genome_count = 1
 
     with open(output_filename, "w") as file_output:
         with open(filename) as file_handler:
@@ -117,16 +126,15 @@ def fasta_process_seqs(filename, replace_names_lcl, replace_names_space,  replac
 
                 if line.find(">") == 0 or line_count == last_line:
                     if seq_count > 0:
-
-                        if replace_names_lcl:
-                            name = ">lcl|GenomeSeq" + str(genome_count) + "_cds_" + name[1:]
-                        elif replace_names_space:
-                            name = ">Genome" + str(genome_count) + " " + name[1:]
-                        elif replace_names_convert:
-                            name = name.replace(">lcl|", ">").replace("_cds_", " ")
-
                         if not single_genome:
                             genome_count += 1
+
+                        if replace_names_lcl:
+                            name = ">lcl|" + seq_stub + str(genome_count) + "_cds_" + name[1:]
+                        elif replace_names_space:
+                            name = ">" + seq_stub + str(genome_count) + " " + name[1:]
+                        elif replace_names_convert:
+                            name = name.replace(">lcl|", ">").replace("_cds_", " ")
 
                         sequence = correct_seq(sequence, name)
                         sequence = check_seq_coding(sequence, name, trim_seq, truncate_seq)
@@ -141,14 +149,11 @@ def fasta_process_seqs(filename, replace_names_lcl, replace_names_space,  replac
 
     print("Total sequences in file  = " + str(seq_count))
 
-    if single_genome:
-        genome_count = 2
-
     if replace_names_lcl or replace_names_space:
-        print("Total genomes  = " + str(genome_count-1))
+        print("Total genomes  = " + str(genome_count))
 
 
-print("seqfeats_parser.py started...\n")
+print("seqfeats_parser.py started...")
 
 arguments = len(sys.argv)
 
@@ -158,19 +163,21 @@ arg_replace_convert = False
 arg_single_genome = False
 arg_trim_seq = False
 arg_truncate_seq = False
+arg_virus = True
 
 if arguments < 2:
-    print("Error - incorrect number of arguments [" + str(arguments) + "] - example usage:")
+    print("Error - incorrect number of arguments [" + str(arguments-1) + "] - example usage:\n")
     print("seqfeats_parser.py sequences.fasta")
-    print("seqfeats_parser.py sequences.fasta [optional]replace-names-lcl [optional]replace-names-space [optional]replace-names-convert [optional]single-genome [optional]trim-seq [otpional]truncate-seq [optional]")
-    print("replace-names-lcl: will replace the '>' with '>lcl|GenomeSeqN_cds_existing_header' where N is genome number (see below).")
-    print("replace-names-space: will replace '>' with '>GenomeN existing_header' - where N is genome number (see below)")
-    print("replace-names-convert: convert '>lcl|Accession_cds_existing_header' to '>Accession existing_header'")
-    print("single-genome: all the coding sequences are from the same genome so N in GenomeN (see above) is always 1. If not set, N increments with each sequence")
+    print("seqfeats_parser.py sequences.fasta [optional]replace-names-lcl [optional]replace-names-space [optional]replace-names-convert [optional]single-genome [optional]trim-seq [otpional]truncate-seq")
+    print("\nreplace-names-lcl: will replace the '>' with '>lcl|ViralGenomeN_cds_ExistingHeader' where N is genome number (see below).")
+    print("replace-names-space: will replace '>' with '>ViralGenomeN ExistingHeader' - where N is genome number (see below)")
+    print("replace-names-convert: convert '>lcl|Accession_cds_ExistingHeader' to '>Accession ExistingHeader'")
+    print("single-genome: all the coding sequences are from the same genome, so N in ViralGenomeN (see above) is always 1. If not set, N increments with each sequence")
     print("trim-seq: if coding sequence not a multiple of three then trim off last incomplete codon")
-    print("truncate_seq: if coding sequence has a STOP before the last codon, then truncate the sequence at the first STOP")
-    # fix slippage option
-    print("Output will be in single line FASTA format - all sequence on single line")
+    print("truncate_seq: if coding sequence has a STOP before the last codon, then truncate the sequence at the first STOP codon")
+    # not-virus - keep it hidden just now - for host transcripts - add later
+    # fix_slippage option
+    print("\nOutput will be in single line FASTA format - all sequence on single line")
     print("Exiting...")
     sys.exit(1)
 
@@ -191,16 +198,23 @@ if arguments > 2:
             arg_trim_seq = True
         elif argu.lower() == "truncate-seq":
             arg_truncate_seq = True
+        elif argu.lower() == "not-virus":
+            arg_virus = False
         else:
             print("Error - unrecognised argument: " + argu)
             sys.exit(1)
 
+# can only have one of these set
 if arg_replace_convert:
     arg_replace_lcl = False
     arg_replace_space = False
 elif arg_replace_space:
     arg_replace_lcl = False
 
-fasta_process_seqs(sys.argv[1], arg_replace_lcl, arg_replace_space, arg_replace_convert, arg_single_genome, arg_trim_seq, arg_truncate_seq)
+if arg_single_genome:
+    if not arg_replace_lcl and not arg_replace_space:
+        print("Warning - setting single-genome without replace-names-lcl or replace-names-space will have no effect")
+
+fasta_process_seqs(sys.argv[1], arg_replace_lcl, arg_replace_space, arg_replace_convert, arg_single_genome, arg_trim_seq, arg_truncate_seq, arg_virus)
 
 print("\n...finished seqfeats_parser.py")
